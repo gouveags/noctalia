@@ -48,6 +48,7 @@ Singleton {
   property int pairWaitSeconds: 45
   property int connectAttempts: 5
   property int connectRetryIntervalMs: 2000
+  readonly property int scanAutoStopMs: 10000
 
   // Interaction state
   property bool pinRequired: false
@@ -146,6 +147,18 @@ Singleton {
     }
   }
 
+  // Auto-stop discovery after a short window.
+  Timer {
+    id: scanAutoStopTimer
+    interval: root.scanAutoStopMs
+    repeat: false
+    onTriggered: {
+      if (root.scanningActive) {
+        root.setScanActive(false);
+      }
+    }
+  }
+
   // Adapter power (enable/disable) via bluetoothctl
   function setBluetoothEnabled(state) {
     if (!adapter) {
@@ -195,6 +208,11 @@ Singleton {
       }
     } catch (e) {
       Logger.e("Bluetooth", "setScanActive failed", e);
+    }
+    if (active) {
+      scanAutoStopTimer.restart();
+    } else {
+      scanAutoStopTimer.stop();
     }
   }
 
