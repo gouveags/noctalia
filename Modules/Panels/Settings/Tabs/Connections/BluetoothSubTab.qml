@@ -105,15 +105,13 @@ Item {
   function _updateScanningState() {
     if (effectivelyVisible && BluetoothService.enabled && !showOnlyLists) {
       Logger.d("BluetoothPrefs", "Panel/tab active");
-      if (!isScanningActive) {
-        BluetoothService.setScanActive(true);
-      }
+      BluetoothService.setScanActive(true);
       if (!Settings.data.network.disableDiscoverability && !isDiscoverable) {
         BluetoothService.setDiscoverable(true);
       }
     } else {
       Logger.d("BluetoothPrefs", "Panel/tab inactive");
-      if (isScanningActive && !showOnlyLists) {
+      if (!showOnlyLists) {
         BluetoothService.setScanActive(false);
       }
       if (isDiscoverable && !showOnlyLists) {
@@ -124,7 +122,7 @@ Item {
 
   Component.onDestruction: {
     // Ensure scanning is stopped when component is closed
-    if (isScanningActive && !showOnlyLists) {
+    if (!showOnlyLists) {
       BluetoothService.setScanActive(false);
     }
     // Ensure discoverable is disabled when component is closed
