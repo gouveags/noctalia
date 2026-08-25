@@ -10,6 +10,7 @@
 #include "ui/style.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <memory>
 #include <string>
@@ -19,6 +20,7 @@
 using namespace control_center;
 
 namespace {
+  constexpr auto kDiscoveryTimeout = std::chrono::seconds(10);
 
   constexpr float kRowMinHeight = Style::controlHeightLg;
 
@@ -513,12 +515,13 @@ void BluetoothTab::doUpdate(Renderer& renderer) {
 }
 
 void BluetoothTab::setActive(bool active) {
-  if (!active && m_service != nullptr && m_service->state().discovering) {
-    m_service->stopDiscovery();
+  if (!active) {
+    stopDiscoveryScan();
   }
 }
 
 void BluetoothTab::onClose() {
+  stopDiscoveryScan();
   m_rootLayout = nullptr;
   m_pairingCard = nullptr;
   m_pairingTitle = nullptr;
@@ -636,6 +639,29 @@ void BluetoothTab::syncPairingCard() {
   }
   if (m_pairingInputRow != nullptr) {
     m_pairingInputRow->setVisible(needsInput);
+  }
+}
+
+void BluetoothTab::startDiscoveryScan() {
+  if (m_service == nullptr) {
+    return;
+  }
+  // A repeated click renews the lease without racing asynchronous Stop/Start calls.
+  if (!m_discoveryRequested) {
+    m_discoveryRequested = true;
+    m_service->startDiscovery();
+  }
+  m_discoveryTimer.start(kDiscoveryTimeout, [this]() { stopDiscoveryScan(); });
+}
+
+void BluetoothTab::stopDiscoveryScan() {
+  m_discoveryTimer.stop();
+  if (!m_discoveryRequested) {
+    return;
+  }
+  m_discoveryRequested = false;
+  if (m_service != nullptr) {
+    m_service->stopDiscovery();
   }
 }
 
@@ -783,13 +809,7 @@ void BluetoothTab::rebuildDeviceList(Renderer& renderer) {
             .minHeight = Style::fontSizeBody * scale,
             .padding = Style::spaceXs * scale,
             .radius = Style::scaledRadiusSm(scale),
-            .onClick = [this]() {
-              if (m_service == nullptr) {
-                return;
-              }
-              m_service->stopDiscovery();
-              m_service->startDiscovery();
-            },
+            .onClick = [this]() { startDiscoveryScan(); },
         })
     );
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/timer_manager.h"
 #include "dbus/bluetooth/bluetooth_agent.h"
 #include "dbus/bluetooth/bluetooth_service.h"
 #include "shell/control_center/tab.h"
@@ -35,6 +36,8 @@ private:
   void syncHeader();
   void syncPairingCard();
   void rebuildDeviceList(Renderer& renderer);
+  void startDiscoveryScan();
+  void stopDiscoveryScan();
   // Pushes live metric values into the existing rows. Returns true if any changed.
   bool syncDeviceRows();
   [[nodiscard]] std::string structureKey(const std::vector<BluetoothDeviceInfo>& devices) const;
@@ -61,6 +64,9 @@ private:
   Toggle* m_discoverableToggle = nullptr;
   Button* m_rescanButton = nullptr;
   Spinner* m_scanSpinner = nullptr;
+
+  Timer m_discoveryTimer;
+  bool m_discoveryRequested = false;
 
   std::unordered_map<std::string, BluetoothDeviceRow*> m_deviceRows;
 
