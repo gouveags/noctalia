@@ -53,7 +53,7 @@ Singleton {
   property bool pinRequired: false
 
   // Internal variables
-  property bool _discoveryWasRunning: false
+  property bool _scanRequested: false
   property bool _ctlInit: false
   property var _autoConnectQueue: []
 
@@ -183,12 +183,12 @@ Singleton {
     }
   }
 
-  // Unify discovery controls
-  function setScanActive(active) {
+  function _applyScanRequest() {
     if (!adapter) {
       Logger.d("Bluetooth", "Scan request ignored: adapter unavailable");
       return;
     }
+    const active = root._scanRequested && !pairingProcess.running;
     try {
       if (active || adapter.discovering) { // Only attempt to set if activating, or if deactivating and currently currently discovering
         adapter.discovering = active;
@@ -196,6 +196,12 @@ Singleton {
     } catch (e) {
       Logger.e("Bluetooth", "setScanActive failed", e);
     }
+  }
+
+  // Track whether the visible Bluetooth UI owns an active discovery request.
+  function setScanActive(active) {
+    root._scanRequested = active;
+    root._applyScanRequest();
   }
 
   // Toggle adapter discoverability (advertising visibility) via bluetoothctl
@@ -368,12 +374,6 @@ Singleton {
     const intervalMs = Math.max(500, Number(root.connectRetryIntervalMs) | 0);
     const intervalSec = Math.max(1, Math.round(intervalMs / 1000));
 
-    // Temporarily pause discovery during pair/connect to reduce HCI churn
-    root._discoveryWasRunning = root.scanningActive;
-    if (root.scanningActive) {
-      root.setScanActive(false);
-    }
-
     const scriptPath = Quickshell.shellDir + "/Scripts/python/src/network/bluetooth-pair.py";
     pairingProcess.command = ["python3", scriptPath, String(addr), String(pairWait), String(attempts), String(intervalSec)];
     pairingProcess.running = true;
@@ -516,6 +516,7 @@ Singleton {
   // Interactive pairing process
   Process {
     id: pairingProcess
+    onRunningChanged: root._applyScanRequest()
     stdout: SplitParser {
       onRead: data => {
         Logger.d("Bluetooth", data);
@@ -528,11 +529,6 @@ Singleton {
     onExited: {
       root.pinRequired = false;
       Logger.i("Bluetooth", "Pairing process exited.");
-      // Restore discovery if we paused it
-      if (root._discoveryWasRunning) {
-        root.setScanActive(true);
-      }
-      root._discoveryWasRunning = false;
     }
     environment: ({
                     "LC_ALL": "C"
